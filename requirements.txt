@@ -1,0 +1,6 @@
+fastapi==0.109.2
+pydantic==2.6.1
+python-dotenv==1.0.1
+python_jose==3.3.0
+pytz==2023.3.post1
+SQLAlchemy==2.0.23
