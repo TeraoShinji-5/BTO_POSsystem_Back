@@ -19,11 +19,11 @@ import pytz
 from dotenv import load_dotenv
 
 load_dotenv()
-# DATABASE_URL = os.getenv('DATABASE_URL')
+DATABASE_URL = os.getenv('DATABASE_URL')
 
 # # トークンを生成するためのシークレットキー
-# SECRET_KEY = os.getenv('SECRET_KEY')
-# ALGORITHM = "HS256"
+SECRET_KEY = os.getenv('SECRET_KEY')
+ALGORITHM = "HS256"
 
 app = FastAPI()
 
@@ -43,9 +43,9 @@ def index():
 
 
 # # データベース接続設定
-# engine = create_engine(DATABASE_URL)
-# SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-# Base = declarative_base()
+engine = create_engine(DATABASE_URL)
+SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+Base = declarative_base()
 
 # class ProductDB(Base):
 #     __tablename__ = 'products'
