@@ -14,6 +14,9 @@ from pytz import timezone
 from fastapi.middleware.cors import CORSMiddleware
 import pytz
 
+#追加分2023/03/12
+from fastapi import status
+
 
 # 環境変数の読み込み
 from dotenv import load_dotenv
@@ -21,7 +24,7 @@ from dotenv import load_dotenv
 load_dotenv()
 DATABASE_URL = os.getenv('DATABASE_URL')
 
-# # トークンを生成するためのシークレットキー
+# トークンを生成するためのシークレットキー
 SECRET_KEY = os.getenv('SECRET_KEY')
 ALGORITHM = "HS256"
 
@@ -36,13 +39,7 @@ app.add_middleware(
     allow_headers=["*"],  # すべてのヘッダーを許可します。必要に応じて指定します。
 )
 
-
-@app.get('/')
-def index():
-    return "<h1>Hello FastAPI World.</h1>"
-
-
-# # データベース接続設定
+# データベース接続設定
 engine = create_engine(DATABASE_URL)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
@@ -124,6 +121,81 @@ class Trades(BaseModel):
     buy_time: Optional[datetime]  # buy_time フィールドをオプションに変更
 
 
+class EventsDB(Base):
+    __tablename__ = 'events'
+    event_id = Column(Integer, primary_key=True, autoincrement=True, nullable=False)
+    event_title = Column(String(50), nullable=False)
+    host_name = Column(String(50), nullable=False)
+    event_time = Column(DateTime, nullable=True)
+
+
+class RegistrationsDB(Base):
+    __tablename__ = 'registrations'
+    registration_id = Column(Integer, primary_key=True, autoincrement=True, nullable=False)
+    user_name = Column(String(45), nullable=False)
+    vegetable_name = Column(String(45), nullable=False)
+    price = Column(Integer, nullable=False)
+    initial_counts = Column(Integer, nullable=False)
+    barcode = Column(Integer, nullable=False)
+    message = Column(String(200), nullable=True)
+    range_name = Column(String(45), nullable=True)
+    registration_date = Column(DateTime, nullable=True)
+
+class Registrations(BaseModel):
+    token: str
+    vegetable_name: str
+    price: int
+    initial_counts: int
+    message: str
+    range_name: str
+    registration_date: Optional[datetime]
+
+
+
+class FriendsDB(Base):
+    __tablename__ = 'friends'
+    friend_id = Column(Integer, primary_key=True, autoincrement=True, nullable=False)
+    my_name = Column(String(45), nullable=False)
+    friend_name = Column(String(45), nullable=False)
+    approval_date = Column(DateTime, nullable=True)
+
+
+class ParticipantsDB(Base):
+    __tablename__ = 'participants'
+    participant_id = Column(Integer, primary_key=True, autoincrement=True, nullable=False)
+    event_id = Column(Integer, nullable=False)
+    participant_name = Column(String(45), nullable=False)
+    comment = Column(String(200), nullable=False)
+    last_update = Column(DateTime, nullable=True)
+
+
+class RangesDB(Base):
+    __tablename__ = 'ranges'
+    range_id = Column(Integer, primary_key=True, autoincrement=True, nullable=False)
+    range_name = Column(String(45), nullable=False)
+
+
+class VegetablesDB(Base):
+    __tablename__ = 'vegetables'
+    vegetable_id = Column(Integer, primary_key=True, autoincrement=True, nullable=False)
+    vegetable_name = Column(String(45), nullable=False)
+
+
+class InventoryDB(Base):
+    __tablename__ = 'inventory'
+    inventory_id = Column(Integer, primary_key=True, autoincrement=True, nullable=False)
+    registration_id = Column(Integer, nullable=False)
+    vegetable_name = Column(String(45), nullable=False)
+    now_counts = Column(Integer, nullable=False)
+    initial_counts = Column(Integer, nullable=False)
+    last_update = Column(DateTime, nullable=True)
+
+
+
+
+
+
+
 # データベースのセットアップ
 Base.metadata.create_all(bind=engine)
 
@@ -133,6 +205,32 @@ def to_jst(datetime_obj):
     utc_zone = pytz.utc
     jst_zone = pytz.timezone('Asia/Tokyo')
     return datetime_obj.replace(tzinfo=utc_zone).astimezone(jst_zone)
+
+
+def calculate_luhn_checksum(barcode_str):
+    # 各桁の数字に対して逆順に処理を行うための準備
+    digits = [int(digit) for digit in reversed(barcode_str)]
+
+    # 合計を計算するための変数
+    total_sum = 0
+
+    # 各桁について処理
+    for i, digit in enumerate(digits):
+        # 奇数番目（実際には偶数インデックス）の場合はそのまま、偶数番目（奇数インデックス）の場合は2倍
+        if i % 2 == 0:
+            # 奇数番目の桁はそのまま加算
+            total_sum += digit
+        else:
+            # 偶数番目の桁は2倍して、10以上なら各桁の和を加算
+            doubled_digit = digit * 2
+            total_sum += doubled_digit if doubled_digit < 10 else doubled_digit - 9
+
+    # チェックディジットの計算（10から合計の1の位を引く。ただし、結果が10の場合は0とする）
+    check_digit = (10 - (total_sum % 10)) % 10
+
+    return check_digit
+
+
 
 
 @app.post('/login')
@@ -263,3 +361,61 @@ def add_deal_detail(products: ProductList):
         db.add(new_detail)
     db.commit()
     return {'message': 'Deal details added successfully'}
+
+
+#登録画面に遷移した際に、登録できる野菜をNETX.jsに渡す
+@app.get("/vegetables")
+async def read_vegetables_info(skip: int = 0, limit: int = 99):
+    db = SessionLocal()
+    vegetables = db.query(VegetablesDB).offset(skip).limit(limit).all()
+    return {"vegetables": [vegetable.vegetable_name for vegetable in vegetables]}
+
+#登録画面に遷移した際に、登録できるrangeをNETX.jsに渡す
+@app.get("/ranges")
+async def read_ranges_info(skip: int = 0, limit: int = 99):
+    db = SessionLocal()
+    ranges = db.query(RangesDB).offset(skip).limit(limit).all()
+    return {"range": [range.range_name for range in ranges]}
+
+
+@app.post("/registrations/", status_code=status.HTTP_201_CREATED)
+def create_registration(registration: Registrations):
+    db = SessionLocal()
+    # tokenからuser_nameを取得
+    user = db.query(UserDB).filter(UserDB.token == registration.token).first()
+    if user is None:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    # vegetable_nameからvegetable_idを取得してbarcodeを生成
+    vegetable = db.query(VegetablesDB).filter(VegetablesDB.vegetable_name == registration.vegetable_name).first()
+    if vegetable is None:
+        raise HTTPException(status_code=404, detail="Vegetable not found")
+
+    head_str = "3"
+    vegetable_id_str = str(vegetable.vegetable_id).zfill(3)
+    initial_counts_str = str(registration.initial_counts).zfill(3)
+    price_str = str(registration.price).zfill(5)
+
+    # バーコード生成ロジック (チェックディジットを計算する方法を追加する必要があります)
+    barcode_str = head_str + vegetable_id_str + initial_counts_str + price_str
+    # ここにチェックディジットの計算と追加のロジックを実装
+
+    # チェックディジットの計算 (Luhnアルゴリズム)
+    check_digit = calculate_luhn_checksum(barcode_str)
+    barcode = int(barcode_str + str(check_digit))
+
+    db_registration = RegistrationsDB(
+        user_name=user.user_name,
+        vegetable_name=registration.vegetable_name,
+        price=registration.price,
+        initial_counts=registration.initial_counts,
+        message=registration.message,
+        range=registration.range,
+        registration_date=registration.registration_date,
+        barcode=barcode
+    )
+    db.add(db_registration)
+    db.commit()
+    db.refresh(db_registration)
+    return db_registration
+
