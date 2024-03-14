@@ -410,7 +410,7 @@ def create_registration(registration: Registrations):
         price=registration.price,
         initial_counts=registration.initial_counts,
         message=registration.message,
-        range=registration.range,
+        range_name=registration.range_name,
         registration_date=registration.registration_date,
         barcode=barcode
     )
