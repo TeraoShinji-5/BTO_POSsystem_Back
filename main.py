@@ -136,6 +136,7 @@ class RegistrationsDB(Base):
     user_name = Column(String(45), nullable=False)
     vegetable_name = Column(String(45), nullable=False)
     price = Column(Integer, nullable=False)
+    peer = Column(Integer, nullable=False)
     initial_counts = Column(Integer, nullable=False)
     barcode = Column(Integer, nullable=False)
     message = Column(String(200), nullable=True)
@@ -146,6 +147,7 @@ class Registrations(BaseModel):
     token: str
     vegetable_name: str
     price: int
+    peer: int
     initial_counts: int
     message: str
     range_name: str
@@ -420,6 +422,7 @@ def create_registration(registration: Registrations):
         user_name=user.user_name,
         vegetable_name=registration.vegetable_name,
         price=registration.price,
+        peer=registration.peer, 
         initial_counts=registration.initial_counts,
         message=registration.message,
         range_name=registration.range_name,
