@@ -16,6 +16,7 @@ import pytz
 
 #追加分2023/03/12
 from fastapi import status
+import re
 
 
 # 環境変数の読み込み
@@ -230,7 +231,20 @@ def calculate_luhn_checksum(barcode_str):
 
     return check_digit
 
+def extract_numeric_timestamp(registration_date):
+    # datetimeオブジェクトをISOフォーマットの文字列に変換
+    if isinstance(registration_date, datetime):
+        registration_date_str = registration_date.isoformat()
+    else:
+        registration_date_str = str(registration_date)
 
+    # 正規表現を使用して数字のみを抽出
+    numeric_parts = re.findall(r'\d', registration_date_str)
+
+    # 抽出した数字を結合して一つの文字列にし、整数に変換
+    numeric_timestamp = int(''.join(numeric_parts))//1000000000000
+    print(numeric_timestamp)
+    return numeric_timestamp
 
 
 @app.post('/login')
@@ -391,13 +405,11 @@ def create_registration(registration: Registrations):
     if vegetable is None:
         raise HTTPException(status_code=404, detail="Vegetable not found")
 
-    head_str = "3"
-    vegetable_id_str = str(vegetable.vegetable_id).zfill(3)
-    initial_counts_str = str(registration.initial_counts).zfill(3)
-    price_str = str(registration.price).zfill(5)
+    user_str = str(user.user_id).zfill(3)
+    registration_date_str = str(extract_numeric_timestamp(registration.registration_date)).zfill(12)
 
     # バーコード生成ロジック (チェックディジットを計算する方法を追加する必要があります)
-    barcode_str = head_str + vegetable_id_str + initial_counts_str + price_str
+    barcode_str = registration_date_str + user_str
     # ここにチェックディジットの計算と追加のロジックを実装
 
     # チェックディジットの計算 (Luhnアルゴリズム)
