@@ -394,7 +394,7 @@ async def read_ranges_info(skip: int = 0, limit: int = 99):
     return {"range": [range.range_name for range in ranges]}
 
 
-@app.post("/registrations/", status_code=status.HTTP_201_CREATED)
+@app.post("/registrations", status_code=status.HTTP_201_CREATED)
 def create_registration(registration: Registrations):
     db = SessionLocal()
     # tokenからuser_nameを取得
