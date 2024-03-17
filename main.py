@@ -422,7 +422,7 @@ def create_registration(registration: Registrations):
         user_name=user.user_name,
         vegetable_name=registration.vegetable_name,
         price=registration.price,
-        peer=registration.peer, 
+        peer=registration.peer,
         initial_counts=registration.initial_counts,
         message=registration.message,
         range_name=registration.range_name,
@@ -433,4 +433,25 @@ def create_registration(registration: Registrations):
     db.commit()
     db.refresh(db_registration)
     return db_registration
+
+
+@app.get("/print")
+async def read_registration_info(registration_id: int = Query(..., description="Registration Id")):
+    db = SessionLocal()
+    printing = db.query(RegistrationsDB).filter_by(registrations_registration_id=registration_id).first()
+    if printing:
+        # printingの情報を取得
+        printing_info = {
+            "vegetable_name": printing.vegetable_name,
+            "price": printing.price,
+            "peer": printing.peer,
+            "user_name": printing.user_name,
+            "barcode": printing.barcode,
+        }
+
+        db.close()
+        return printing_info
+    else:
+        db.close()
+        return JSONResponse(content={"product_id": "idが未登録です"}, status_code=404)
 
