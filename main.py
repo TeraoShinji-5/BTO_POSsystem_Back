@@ -438,7 +438,7 @@ def create_registration(registration: Registrations):
 @app.get("/print")
 async def read_registration_info(registration_id: int = Query(..., description="Registration Id")):
     db = SessionLocal()
-    printing = db.query(RegistrationsDB).filter_by(registrations_registration_id=registration_id).first()
+    printing = db.query(RegistrationsDB).filter_by(registration_id=registration_id).first()
     if printing:
         # printingの情報を取得
         printing_info = {
