@@ -418,6 +418,13 @@ def create_registration(registration: Registrations):
     check_digit = calculate_luhn_checksum(barcode_str)
     barcode = int(barcode_str + str(check_digit))
 
+    # registration_dateがUTCで提供されていると仮定し、JSTに変換
+    if registration.registration_date:
+        registration_date_jst = to_jst(registration.registration_date)
+    else:
+        # registration_dateが提供されていない場合のフォールバック
+        registration_date_jst = to_jst(datetime.now(pytz.utc))
+
     db_registration = RegistrationsDB(
         user_name=user.user_name,
         vegetable_name=registration.vegetable_name,
@@ -426,7 +433,7 @@ def create_registration(registration: Registrations):
         initial_counts=registration.initial_counts,
         message=registration.message,
         range_name=registration.range_name,
-        registration_date=registration.registration_date,
+        registration_date=registration.registration_date_jst,
         barcode=barcode
     )
     db.add(db_registration)
