@@ -86,6 +86,7 @@ class Product(BaseModel):
     quantity: int
     price: int
     peer: int
+    tax_percent: float
     buy_time: datetime
 
 class ProductList(BaseModel):
