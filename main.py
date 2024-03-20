@@ -71,21 +71,21 @@ class User(BaseModel):
 class Deal_DetailsDB(Base):
     __tablename__ = 'deal_details'  # テーブル名を指定
     deal_id = Column(Integer, primary_key=True, nullable=False)
-    event_id = Column(Integer, nullable=True)  # MySQL定義に合わせてデフォルトNULL
     quantity = Column(Integer, nullable=False)
-    product_qrcode = Column(Integer, nullable=False)
+    barcode = Column(Integer, nullable=False)
     product_name = Column(String(255), nullable=False)  # 長さを255に合わせる
     price = Column(Integer, nullable=False)
+    peer = Column(Integer, nullable=False)
     tax_percent = Column(Numeric(precision=5, scale=2), nullable=False)
     buy_time = Column(DateTime, nullable=False)  # nullable=TrueからFalseに変更
 
 # リクエストボディのモデル定義
 class Product(BaseModel):
-    product_qrcode: int
+    barcode: int
     product_name: str
-    price: int
     quantity: int
-    tax_percent: float
+    price: int
+    peer: int
     buy_time: datetime
 
 class ProductList(BaseModel):
@@ -109,6 +109,7 @@ class TradesDB(Base):
     store_id = Column(Integer, nullable=False)
     total_charge = Column(Integer, nullable=False)
     total_charge_wo_tax = Column(Integer, nullable=False)
+    total_peer = Column(Integer, nullable=False)
     user_id = Column(Integer, nullable=True)
 
 # Pydanticモデルの定義
@@ -119,6 +120,7 @@ class Trades(BaseModel):
     machine_id: int
     total_charge: int
     total_charge_wo_tax: int
+    total_peer: int
     buy_time: Optional[datetime]  # buy_time フィールドをオプションに変更
 
 
@@ -134,18 +136,21 @@ class RegistrationsDB(Base):
     __tablename__ = 'registrations'
     registration_id = Column(Integer, primary_key=True, autoincrement=True, nullable=False)
     user_name = Column(String(45), nullable=False)
-    vegetable_name = Column(String(45), nullable=False)
+    product_name = Column(String(45), nullable=False)
+    quantity = Column(Integer, nullable=False)
     price = Column(Integer, nullable=False)
     peer = Column(Integer, nullable=False)
+    now_counts = Column(Integer, nullable=False)
     initial_counts = Column(Integer, nullable=False)
     barcode = Column(Integer, nullable=False)
     message = Column(String(200), nullable=True)
     range_name = Column(String(45), nullable=True)
-    registration_date = Column(DateTime, nullable=True)
+    registration_date = Column(DateTime, nullable=False)
+    last_update = Column(DateTime, nullable=False)
 
 class Registrations(BaseModel):
     token: str
-    vegetable_name: str
+    product_name: str
     price: int
     peer: int
     initial_counts: int
@@ -182,19 +187,6 @@ class VegetablesDB(Base):
     __tablename__ = 'vegetables'
     vegetable_id = Column(Integer, primary_key=True, autoincrement=True, nullable=False)
     vegetable_name = Column(String(45), nullable=False)
-
-
-class InventoryDB(Base):
-    __tablename__ = 'inventory'
-    inventory_id = Column(Integer, primary_key=True, autoincrement=True, nullable=False)
-    registration_id = Column(Integer, nullable=False)
-    vegetable_name = Column(String(45), nullable=False)
-    now_counts = Column(Integer, nullable=False)
-    initial_counts = Column(Integer, nullable=False)
-    last_update = Column(DateTime, nullable=True)
-
-
-
 
 
 
@@ -295,32 +287,32 @@ async def read_login(token: str = Query(..., description="Token information")):
     return {"user_name": user_name}
 
 
-@app.get("/qrcode")
-async def read_products_info(qrcode: int = Query(..., description="Product QR code")):
-    db = SessionLocal()
-    product = db.query(ProductDB).filter_by(product_qrcode=qrcode).first()
-    if product:
-        # Productの情報を取得
-        product_info = {
-            "product_id": product.product_id,
-            "product_name": product.product_name,
-            "price": product.price,
-            "product_qrcode": product.product_qrcode,
-            "quantity": product.quantity,
-        }
+# @app.get("/qrcode")
+# async def read_products_info(qrcode: int = Query(..., description="Product QR code")):
+#     db = SessionLocal()
+#     product = db.query(ProductDB).filter_by(product_qrcode=qrcode).first()
+#     if product:
+#         # Productの情報を取得
+#         product_info = {
+#             "product_id": product.product_id,
+#             "product_name": product.product_name,
+#             "price": product.price,
+#             "product_qrcode": product.product_qrcode,
+#             "quantity": product.quantity,
+#         }
 
-        # Taxの情報を取得
-        tax = db.query(TaxDB).first()
-        if tax:
-            product_info["tax_percent"] = tax.tax_percent
-        else:
-            product_info["tax_percent"] = 0.1  # デフォルト値などを設定する必要がある場合
+#         # Taxの情報を取得
+#         tax = db.query(TaxDB).first()
+#         if tax:
+#             product_info["tax_percent"] = tax.tax_percent
+#         else:
+#             product_info["tax_percent"] = 0.1  # デフォルト値などを設定する必要がある場合
 
-        db.close()
-        return product_info
-    else:
-        db.close()
-        return JSONResponse(content={"product_name": "商品がマスタ未登録です"}, status_code=404)
+#         db.close()
+#         return product_info
+#     else:
+#         db.close()
+#         return JSONResponse(content={"product_name": "商品がマスタ未登録です"}, status_code=404)
 
 
 @app.post('/trade')
@@ -343,6 +335,7 @@ async def add_trade(trade: Trades):
         machine_id=trade.machine_id,
         total_charge=trade.total_charge,
         total_charge_wo_tax=trade.total_charge_wo_tax,
+        total_peer=trade.total_peer,
         buy_time=buy_time_jst
     )
 
@@ -366,12 +359,12 @@ def add_deal_detail(products: ProductList):
         buy_time_jst = buy_time_utc.astimezone(jst)
 
         new_detail = Deal_DetailsDB(
-            product_qrcode=product.product_qrcode,
+            product_qrcode=product.barcode,
             product_name=product.product_name,
             price=product.price,
+            peer=product.peer,
             quantity=product.quantity,
             tax_percent=product.tax_percent,
-            event_id=1,  # 適切なevent_idの取り扱いを確認してください
             buy_time=buy_time_jst  # JSTに変換した日時を使用
         )
         db.add(new_detail)
@@ -403,7 +396,7 @@ def create_registration(registration: Registrations):
         raise HTTPException(status_code=404, detail="User not found")
 
     # vegetable_nameからvegetable_idを取得してbarcodeを生成
-    vegetable = db.query(VegetablesDB).filter(VegetablesDB.vegetable_name == registration.vegetable_name).first()
+    vegetable = db.query(VegetablesDB).filter(VegetablesDB.vegetable_name == registration.product_name).first()
     if vegetable is None:
         raise HTTPException(status_code=404, detail="Vegetable not found")
 
@@ -420,13 +413,16 @@ def create_registration(registration: Registrations):
 
     db_registration = RegistrationsDB(
         user_name=user.user_name,
-        vegetable_name=registration.vegetable_name,
+        product_name=registration.product_name,
+        quantity=1,
         price=registration.price,
         peer=registration.peer,
+        now_counts=registration.initial_counts,
         initial_counts=registration.initial_counts,
         message=registration.message,
         range_name=registration.range_name,
         registration_date=registration.registration_date,
+        last_update=registration.registration_date,
         barcode=barcode
     )
     db.add(db_registration)
@@ -442,7 +438,7 @@ async def read_registration_info(registration_id: int = Query(..., description="
     if printing:
         # printingの情報を取得
         printing_info = {
-            "vegetable_name": printing.vegetable_name,
+            "product_name": printing.product_name,
             "price": printing.price,
             "peer": printing.peer,
             "user_name": printing.user_name,
@@ -455,3 +451,30 @@ async def read_registration_info(registration_id: int = Query(..., description="
         db.close()
         return JSONResponse(content={"product_id": "idが未登録です"}, status_code=404)
 
+@app.get("/barcode")
+async def read_registrations_info(barcode: int = Query(..., description="Product barcode")):
+    db = SessionLocal()
+    product = db.query(RegistrationsDB).filter_by(barcode=barcode).first()
+    if product:
+        # Productの情報を取得
+        product_info = {
+            "registration_id": product.registration_id,
+            "product_name": product.product_name,
+            "price": product.price,
+            "peer": product.peer,
+            "product_barcode": product.barcode,
+            "quantity": product.quantity,
+        }
+
+        # Taxの情報を取得
+        tax = db.query(TaxDB).first()
+        if tax:
+            product_info["tax_percent"] = tax.tax_percent
+        else:
+            product_info["tax_percent"] = 0.1  # デフォルト値などを設定する必要がある場合
+
+        db.close()
+        return product_info
+    else:
+        db.close()
+        return JSONResponse(content={"product_name": "商品がマスタ未登録です"}, status_code=404)
