@@ -360,7 +360,7 @@ def add_deal_detail(products: ProductList):
         buy_time_jst = buy_time_utc.astimezone(jst)
 
         new_detail = Deal_DetailsDB(
-            product_qrcode=product.barcode,
+            barcode=product.barcode,
             product_name=product.product_name,
             price=product.price,
             peer=product.peer,
