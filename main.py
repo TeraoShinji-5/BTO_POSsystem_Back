@@ -463,7 +463,7 @@ async def read_registrations_info(barcode: int = Query(..., description="Product
             "product_name": product.product_name,
             "price": product.price,
             "peer": product.peer,
-            "product_barcode": product.barcode,
+            "barcode": product.barcode,
             "quantity": product.quantity,
         }
 
