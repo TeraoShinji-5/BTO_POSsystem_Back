@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Depends, HTTPException
+from fastapi import FastAPI, Header, HTTPException
 from pydantic import BaseModel
 from sqlalchemy import create_engine, Column, Integer, String, DateTime, Numeric
 from sqlalchemy.ext.declarative import declarative_base
@@ -13,6 +13,8 @@ from jose import jwt
 from pytz import timezone
 from fastapi.middleware.cors import CORSMiddleware
 import pytz
+import pandas as pd
+
 
 #追加分2023/03/12
 from fastapi import status
@@ -189,6 +191,17 @@ class VegetablesDB(Base):
     vegetable_id = Column(Integer, primary_key=True, autoincrement=True, nullable=False)
     vegetable_name = Column(String(45), nullable=False)
 
+
+class Legacy_UsersDB(Base):
+    __tablename__ = 'legacy_users'
+    legacy_users_id = Column(Integer, primary_key=True, autoincrement=True, nullable=False, unique=True)
+    legacy_user_name = Column(String(45), nullable=False)
+    family_id = Column(Integer, nullable=False)
+    relationship = Column(String(45), nullable=False)
+    complex = Column(String(45), nullable=False)
+    wing = Column(String(45), nullable=False)
+    floor = Column(String(45), nullable=False)
+    registration_date = Column(DateTime, nullable=False)
 
 
 
@@ -479,3 +492,267 @@ async def read_registrations_info(barcode: int = Query(..., description="Product
     else:
         db.close()
         return JSONResponse(content={"product_name": "商品がマスタ未登録です"}, status_code=404)
+
+
+@app.get("/trade")
+async def read_trade_info(
+    buy_time: str = Header(..., description="Time of purchase", example="2023-01-01 12:00:00"),
+    store_id: int = Header(..., description="Store ID"),
+    machine_id: int = Header(..., description="Machine ID")
+):
+    db = SessionLocal()
+
+    try:
+        # buy_timeをdatetimeに変換
+        buy_time_date = datetime.strptime(buy_time, "%Y-%m-%d %H:%M:%S")
+    except ValueError:
+        db.close()
+        raise HTTPException(status_code=400, detail="Invalid buy_time format. Please use YYYY-MM-DD HH:MM:SS format.")
+
+    trade = db.query(TradesDB).filter_by(
+            buy_time=buy_time_date,
+            store_id=store_id,
+            machine_id=machine_id
+        ).first()
+
+    if trade:
+        # tradeの情報を取得
+        trade_result = {
+            "store_id": trade.store_id,
+            "staff_id": trade.staff_id,
+            "machine_id": trade.machine_id,
+            "total_charge": trade.total_charge,
+            "total_charge_wo_tax": trade.total_charge_wo_tax,
+            "total_peer": trade.total_peer,
+        }
+
+        db.close()
+        return trade_result
+    else:
+        db.close()
+        return JSONResponse(content={"message": "購買履歴がありません"}, status_code=404)
+
+
+@app.get("/deal_detail")
+async def read_deal_detail_info(
+    buy_time: str = Header(..., description="Time of purchase")
+):
+    db = SessionLocal()
+
+    try:
+        # buy_timeをdatetimeに変換
+        buy_time_date = datetime.strptime(buy_time, "%Y-%m-%d %H:%M:%S")
+    except ValueError:
+        db.close()
+        raise HTTPException(status_code=400, detail="Invalid buy_time format. Please use YYYY-MM-DD HH:MM:SS format.")
+
+    # Deal_DetailsDB と RegistrationsDB を barcode で結合
+    deal_details = db.query(
+        Deal_DetailsDB.product_name,
+        Deal_DetailsDB.quantity,
+        Deal_DetailsDB.price,
+        Deal_DetailsDB.peer,
+        Deal_DetailsDB.tax_percent,
+        RegistrationsDB.user_name
+    ).join(
+        RegistrationsDB, Deal_DetailsDB.barcode == RegistrationsDB.barcode
+    ).filter(
+        Deal_DetailsDB.buy_time == buy_time_date
+    ).all()
+
+    if deal_details:
+        # deal_detailsの情報を取得
+        deal_result = [
+            {
+            "product_name": deal_detail.product_name,
+            "quantity": deal_detail.quantity,
+            "price": deal_detail.price,
+            "peer": deal_detail.peer,
+            "tax_percent": float(deal_detail.tax_percent),
+            "user_name": deal_detail.user_name if deal_detail.user_name is not None else "-"
+            }
+            for deal_detail in deal_details
+        ]
+
+        db.close()
+        return {"deal_details": deal_result}
+    else:
+        db.close()
+        return JSONResponse(content={"deal_details": "購買履歴がありません"}, status_code=404)
+
+
+@app.get("/message")
+async def read_message_info(
+    buy_time: str = Header(..., description="Time of purchase")
+):
+    db = SessionLocal()
+
+    try:
+        # buy_timeをdatetimeに変換
+        buy_time_date = datetime.strptime(buy_time, "%Y-%m-%d %H:%M:%S")
+    except ValueError:
+        db.close()
+        raise HTTPException(status_code=400, detail="Invalid buy_time format. Please use YYYY-MM-DD HH:MM:SS format.")
+
+    # Deal_DetailsDB と RegistrationsDB を barcode で結合し、RegistrationsDBとLegacy_UsersDBをuser_name==legacy_user_nameで統合
+    buyer_infos = db.query(
+        Deal_DetailsDB.deal_id,
+        RegistrationsDB.user_name,
+        RegistrationsDB.range_name,
+        RegistrationsDB.message,
+        Legacy_UsersDB.legacy_user_name,
+        Legacy_UsersDB.complex,
+        Legacy_UsersDB.wing,
+        Legacy_UsersDB.floor,
+        Legacy_UsersDB.family_id,
+    ).join(
+        RegistrationsDB, Deal_DetailsDB.barcode == RegistrationsDB.barcode
+        ).join(
+        Legacy_UsersDB, RegistrationsDB.user_name == Legacy_UsersDB.legacy_user_name
+    ).filter(
+        Deal_DetailsDB.buy_time == buy_time_date
+    ).all()
+
+    if buyer_infos:
+        # buyer_infosの情報を取得
+        buyer_info_result = [
+            {
+            "deal_id": buyer_info.deal_id if buyer_info.deal_id is not None else "-",
+            "buyer_name": buyer_info.user_name if buyer_info.user_name is not None else "-",
+            "range_name": buyer_info.range_name if buyer_info.range_name is not None else "-",
+            "message": buyer_info.message if buyer_info.message is not None else "-",
+            "buyer_complex": buyer_info.complex if buyer_info.complex is not None else "-",
+            "buyer_wing": buyer_info.wing if buyer_info.wing is not None else "-",
+            "buyer_floor": buyer_info.floor if buyer_info.floor is not None else "-",
+            "buyer_family_id": buyer_info.family_id if buyer_info.family_id is not None else "-"
+            }
+            for buyer_info in buyer_infos
+        ]
+
+        # Deal_DetailsDB と TradesDB を buy_time で結合し、TradesDBとUserDBをuser_idで統合し、UsersDBとLegacy_UsersDBをuser_name==legacy_user_nameで統合
+    seller_infos = db.query(
+        Deal_DetailsDB.deal_id,
+        Legacy_UsersDB.legacy_user_name,
+        Legacy_UsersDB.complex,
+        Legacy_UsersDB.wing,
+        Legacy_UsersDB.floor,
+        Legacy_UsersDB.family_id,
+    ).join(
+        TradesDB, Deal_DetailsDB.buy_time == TradesDB.buy_time
+        ).join(
+        UserDB, TradesDB.user_id == UserDB.user_id
+        ).outerjoin(
+        Legacy_UsersDB, UserDB.user_name == Legacy_UsersDB.legacy_user_name
+    ).filter(
+        Deal_DetailsDB.buy_time == buy_time_date
+    ).all()
+
+    if seller_infos:
+        # buyer_infosの情報を取得
+        seller_info_result = [
+            {
+            "deal_id": seller_info.deal_id if seller_info.deal_id is not None else "-",
+            "seller_name": seller_info.legacy_user_name if seller_info.legacy_user_name is not None else "-",
+            "seller_complex": seller_info.complex if seller_info.complex is not None else "-",
+            "seller_wing": seller_info.wing if seller_info.wing is not None else "-",
+            "seller_floor": seller_info.floor if seller_info.floor is not None else "-",
+            "seller_family_id": seller_info.family_id if seller_info.family_id is not None else "-"
+            }
+            for seller_info in seller_infos
+        ]
+
+        db.close()
+
+
+    # データを pandas DataFrame に変換
+    if buyer_infos:
+        buyer_df = pd.DataFrame(
+                [info for info in buyer_infos],
+                columns=[
+                    "deal_id",
+                    "buyer_name",
+                    "range_name",
+                    "message",
+                    "buyer_legacy_user_name",
+                    "buyer_complex",
+                    "buyer_wing",
+                    "buyer_floor",
+                    "buyer_family_id"
+                ]
+            )
+    else:
+        buyer_df = pd.DataFrame()
+
+    if seller_infos:
+        seller_df = pd.DataFrame(
+                [info for info in seller_infos],
+                columns=[
+                    "deal_id",
+                    "seller_name",
+                    "seller_complex",
+                    "seller_wing",
+                    "seller_floor",
+                    "seller_family_id"
+                ]
+            )
+    else:
+        seller_df = pd.DataFrame()
+
+    # DataFrame を 'deal_id' で結合
+    combined_df = pd.merge(buyer_df, seller_df, on="deal_id", how="outer")
+
+    # 条件1: "range_name"が"同じ団地の方へ"で、buyer_complexとseller_complexが異なる行を削除
+    mask1 = (combined_df['range_name'] == "同じ団地の方へ") & (combined_df['buyer_complex'] != combined_df['seller_complex'])
+    combined_df = combined_df[~mask1]
+
+    # 条件2: "range_name"が"同じ棟の方へ"で、同じcomplex内で異なるwingの行を削除
+    mask2 = (combined_df['range_name'] == "同じ棟の方へ") & ((combined_df['buyer_complex'] != combined_df['seller_complex']) | (combined_df['buyer_wing'] != combined_df['seller_wing']))
+    combined_df = combined_df[~mask2]
+
+    # データ型を確認し、必要に応じて整数型に変換
+    try:
+        combined_df['buyer_floor'] = pd.to_numeric(combined_df['buyer_floor'], errors='coerce')
+        combined_df['seller_floor'] = pd.to_numeric(combined_df['seller_floor'], errors='coerce')
+    except Exception as e:
+        return {"error": str(e)}
+
+    # データ型変換後に None が含まれているか確認
+    if combined_df['buyer_floor'].isnull().any() or combined_df['seller_floor'].isnull().any():
+        return {"error": "Floor data contains non-integer values or NaN."}
+
+    # 条件3: "range_name"が"同じ棟の同じ階の方へ"で、同じcomplex, 同じwingで異なるfloorの行を削除
+    # floorの10の位を取得するために、floorを整数型として扱い、10で割った商を比較
+    combined_df['buyer_floor_tens'] = combined_df['buyer_floor'] // 10
+    combined_df['seller_floor_tens'] = combined_df['seller_floor'] // 10
+
+    mask3 = (
+        combined_df['range_name'] == "同じ棟の同じ階の方へ") & (
+        (combined_df['buyer_complex'] != combined_df['seller_complex']) |
+        (combined_df['buyer_wing'] != combined_df['seller_wing']) |
+        (combined_df['buyer_floor_tens'] != combined_df['seller_floor_tens'])
+    )
+    combined_df = combined_df[~mask3]
+
+    # 不要になった 'buyer_floor_tens' と 'seller_floor_tens' 列を削除
+    combined_df.drop(['buyer_floor_tens', 'seller_floor_tens'], axis=1, inplace=True)
+
+    # 'buyer_name', 'range_name', 'seller_name', 'message' の組み合わせが重複している行を識別
+    duplicates = combined_df.duplicated(subset=['buyer_name', 'range_name', 'seller_name', 'message'], keep=False)
+
+    # 重複している行を削除
+    combined_df = combined_df[~duplicates]
+
+    # 'range_name' カラムの値から "の方へ" という文字列を削除
+    combined_df['range_name'] = combined_df['range_name'].str.replace("の方へ", "", regex=False)
+
+    # combined_df から特定のカラムのみを含む新しい DataFrame を作成
+    selected_columns_df = combined_df[['buyer_name', 'range_name', 'seller_name', 'message']]
+
+    # DataFrame を JSON に変換して応答
+    return selected_columns_df.to_dict(orient="records")
+
+    # else:
+    #     db.close()
+    #     return JSONResponse(content={"deal_details": "購買履歴がありません"}, status_code=404)
+
+
