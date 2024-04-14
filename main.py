@@ -496,9 +496,7 @@ async def read_registrations_info(barcode: int = Query(..., description="Product
 
 @app.get("/trade")
 async def read_trade_info(
-    buy_time: str = Header(..., description="Time of purchase", example="2023-01-01 12:00:00"),
-    store_id: int = Header(..., description="Store ID"),
-    machine_id: int = Header(..., description="Machine ID")
+    buy_time: str = Header(..., description="Time of purchase", example="2023-01-01 12:00:00")
 ):
     db = SessionLocal()
 
@@ -511,8 +509,6 @@ async def read_trade_info(
 
     trade = db.query(TradesDB).filter_by(
             buy_time=buy_time_date,
-            store_id=store_id,
-            machine_id=machine_id
         ).first()
 
     if trade:
@@ -700,6 +696,9 @@ async def read_message_info(
 
     # DataFrame を 'deal_id' で結合
     combined_df = pd.merge(buyer_df, seller_df, on="deal_id", how="outer")
+
+    # 'range_name' が "メッセージを送らない" と等しくない行だけを保持
+    combined_df = combined_df[combined_df['range_name'] != "メッセージを送らない"]
 
     # 条件1: "range_name"が"同じ団地の方へ"で、buyer_complexとseller_complexが異なる行を削除
     mask1 = (combined_df['range_name'] == "同じ団地の方へ") & (combined_df['buyer_complex'] != combined_df['seller_complex'])
