@@ -496,13 +496,23 @@ async def read_registrations_info(barcode: int = Query(..., description="Product
 
 @app.get("/trade")
 async def read_trade_info(
-    buy_time: str = Header(..., description="Time of purchase", example="2023-01-01 12:00:00")
+    buy_time: str = Header(..., description="Time of purchase", example="2024-04-14T10:09:00.490Z")
 ):
+
     db = SessionLocal()
 
     try:
         # buy_timeをdatetimeに変換
-        buy_time_date = datetime.strptime(buy_time, "%Y-%m-%d %H:%M:%S")
+
+        utc_time = datetime.fromisoformat(buy_time.rstrip("Z")).replace(tzinfo=pytz.utc)
+
+        # 日本時間のタイムゾーンを設定
+        jst_timezone = pytz.timezone("Asia/Tokyo")
+
+        # UTCから日本時間に変換
+        jst_time = utc_time.astimezone(jst_timezone)
+
+        buy_time_date = jst_time.strftime("%Y-%m-%d %H:%M:%S")
     except ValueError:
         db.close()
         raise HTTPException(status_code=400, detail="Invalid buy_time format. Please use YYYY-MM-DD HH:MM:SS format.")
@@ -531,13 +541,22 @@ async def read_trade_info(
 
 @app.get("/deal_detail")
 async def read_deal_detail_info(
-    buy_time: str = Header(..., description="Time of purchase")
+    buy_time: str = Header(..., description="Time of purchase", example="2024-04-14T10:09:00.490Z")
 ):
     db = SessionLocal()
 
     try:
         # buy_timeをdatetimeに変換
-        buy_time_date = datetime.strptime(buy_time, "%Y-%m-%d %H:%M:%S")
+        utc_time = datetime.fromisoformat(buy_time.rstrip("Z")).replace(tzinfo=pytz.utc)
+
+        # 日本時間のタイムゾーンを設定
+        jst_timezone = pytz.timezone("Asia/Tokyo")
+
+        # UTCから日本時間に変換
+        jst_time = utc_time.astimezone(jst_timezone)
+
+        # buy_timeをdatetimeに変換
+        buy_time_date = jst_time.strftime("%Y-%m-%d %H:%M:%S")
     except ValueError:
         db.close()
         raise HTTPException(status_code=400, detail="Invalid buy_time format. Please use YYYY-MM-DD HH:MM:SS format.")
@@ -579,13 +598,22 @@ async def read_deal_detail_info(
 
 @app.get("/message")
 async def read_message_info(
-    buy_time: str = Header(..., description="Time of purchase")
+    buy_time: str = Header(..., description="Time of purchase", example="2024-04-14T10:09:00.490Z")
 ):
     db = SessionLocal()
 
     try:
         # buy_timeをdatetimeに変換
-        buy_time_date = datetime.strptime(buy_time, "%Y-%m-%d %H:%M:%S")
+        utc_time = datetime.fromisoformat(buy_time.rstrip("Z")).replace(tzinfo=pytz.utc)
+
+        # 日本時間のタイムゾーンを設定
+        jst_timezone = pytz.timezone("Asia/Tokyo")
+
+        # UTCから日本時間に変換
+        jst_time = utc_time.astimezone(jst_timezone)
+
+        # buy_timeをdatetimeに変換
+        buy_time_date = jst_time.strftime("%Y-%m-%d %H:%M:%S")
     except ValueError:
         db.close()
         raise HTTPException(status_code=400, detail="Invalid buy_time format. Please use YYYY-MM-DD HH:MM:SS format.")
