@@ -508,7 +508,7 @@ async def read_registrations_info(barcode: int = Query(..., description="Product
 
 @app.get("/trade")
 async def read_trade_info(
-    buy_time: str = Header(..., description="Time of purchase", example="2024-04-14T10:09:00.490Z")
+    buy_time: str = Query(..., description="Time of purchase", example="2024-04-14T10:09:00.490Z")
 ):
 
     db = SessionLocal()
@@ -556,7 +556,7 @@ async def read_trade_info(
 
 @app.get("/deal_detail")
 async def read_deal_detail_info(
-    buy_time: str = Header(..., description="Time of purchase", example="2024-04-14T10:09:00.490Z")
+    buy_time: str = Query(..., description="Time of purchase", example="2024-04-14T10:09:00.490Z")
 ):
     db = SessionLocal()
 
@@ -616,7 +616,7 @@ async def read_deal_detail_info(
 
 @app.get("/message")
 async def read_message_info(
-    buy_time: str = Header(..., description="Time of purchase", example="2024-04-14T10:09:00.490Z")
+    buy_time: str = Query(..., description="Time of purchase", example="2024-04-14T10:09:00.490Z")
 ):
     db = SessionLocal()
 
