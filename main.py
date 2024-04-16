@@ -254,6 +254,10 @@ def extract_numeric_timestamp(registration_date):
     print(numeric_timestamp)
     return numeric_timestamp
 
+def remove_milliseconds(dt):
+    # マイクロ秒部分を0に設定してミリ秒を削除
+    return dt.replace(microsecond=0)
+
 
 @app.post('/login')
 async def login(user: User):
@@ -338,7 +342,7 @@ async def add_trade(trade: Trades):
         raise HTTPException(status_code=404, detail="User not found")
 
     # UTCで取得した日時をJSTに変換
-    buy_time_utc = trade.buy_time
+    buy_time_utc = remove_milliseconds(product.buy_time)
     jst = pytz.timezone('Asia/Tokyo')
     buy_time_jst = buy_time_utc.astimezone(jst)
 
@@ -369,7 +373,7 @@ def add_deal_detail(products: ProductList):
 
     for product in products.products:
         # UTCで取得した日時をJSTに変換
-        buy_time_utc = product.buy_time
+        buy_time_utc = remove_milliseconds(product.buy_time)
         buy_time_jst = buy_time_utc.astimezone(jst)
 
         new_detail = Deal_DetailsDB(
