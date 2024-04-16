@@ -254,6 +254,18 @@ def extract_numeric_timestamp(registration_date):
     print(numeric_timestamp)
     return numeric_timestamp
 
+def round_datetime(dt):
+    # マイクロ秒部分を取得してミリ秒に変換
+    milliseconds = dt.microsecond // 1000
+
+    # ミリ秒が500以上なら秒を1増やす
+    if milliseconds >= 500:
+        dt += timedelta(seconds=1)
+
+    # ミリ秒部分を削除（四捨五入後の秒数のみ保持）
+    dt = dt.replace(microsecond=0)
+    return dt
+
 
 @app.post('/login')
 async def login(user: User):
@@ -496,7 +508,7 @@ async def read_registrations_info(barcode: int = Query(..., description="Product
 
 @app.get("/trade")
 async def read_trade_info(
-    buy_time: str = Query(..., description="Time of purchase", example="2024-04-14T10:09:00.490Z")
+    buy_time: str = Header(..., description="Time of purchase", example="2024-04-14T10:09:00.490Z")
 ):
 
     db = SessionLocal()
@@ -512,7 +524,10 @@ async def read_trade_info(
         # UTCから日本時間に変換
         jst_time = utc_time.astimezone(jst_timezone)
 
-        buy_time_date = jst_time.strftime("%Y-%m-%d %H:%M:%S")
+        # ミリ秒を四捨五入
+        jst_time_rounded = round_datetime(jst_time)
+
+        buy_time_date = jst_time_rounded.strftime("%Y-%m-%d %H:%M:%S")
     except ValueError:
         db.close()
         raise HTTPException(status_code=400, detail="Invalid buy_time format. Please use YYYY-MM-DD HH:MM:SS format.")
@@ -541,7 +556,7 @@ async def read_trade_info(
 
 @app.get("/deal_detail")
 async def read_deal_detail_info(
-    buy_time: str = Query(..., description="Time of purchase", example="2024-04-14T10:09:00.490Z")
+    buy_time: str = Header(..., description="Time of purchase", example="2024-04-14T10:09:00.490Z")
 ):
     db = SessionLocal()
 
@@ -555,8 +570,11 @@ async def read_deal_detail_info(
         # UTCから日本時間に変換
         jst_time = utc_time.astimezone(jst_timezone)
 
+        # ミリ秒を四捨五入
+        jst_time_rounded = round_datetime(jst_time)
+
         # buy_timeをdatetimeに変換
-        buy_time_date = jst_time.strftime("%Y-%m-%d %H:%M:%S")
+        buy_time_date = jst_time_rounded.strftime("%Y-%m-%d %H:%M:%S")
     except ValueError:
         db.close()
         raise HTTPException(status_code=400, detail="Invalid buy_time format. Please use YYYY-MM-DD HH:MM:SS format.")
@@ -598,7 +616,7 @@ async def read_deal_detail_info(
 
 @app.get("/message")
 async def read_message_info(
-    buy_time: str = Query(..., description="Time of purchase", example="2024-04-14T10:09:00.490Z")
+    buy_time: str = Header(..., description="Time of purchase", example="2024-04-14T10:09:00.490Z")
 ):
     db = SessionLocal()
 
@@ -612,8 +630,11 @@ async def read_message_info(
         # UTCから日本時間に変換
         jst_time = utc_time.astimezone(jst_timezone)
 
+        # ミリ秒を四捨五入
+        jst_time_rounded = round_datetime(jst_time)
+
         # buy_timeをdatetimeに変換
-        buy_time_date = jst_time.strftime("%Y-%m-%d %H:%M:%S")
+        buy_time_date = jst_time_rounded.strftime("%Y-%m-%d %H:%M:%S")
     except ValueError:
         db.close()
         raise HTTPException(status_code=400, detail="Invalid buy_time format. Please use YYYY-MM-DD HH:MM:SS format.")
@@ -777,12 +798,11 @@ async def read_message_info(
 
     # DataFrameを辞書のリストとして変換
     records = selected_columns_df.to_dict(orient="records")
-    
+
     # 'message_info' キーで辞書を作成
     response = {"message_info": records}
-    
+
     # 応答としてreturnする
     return response
-
 
 
