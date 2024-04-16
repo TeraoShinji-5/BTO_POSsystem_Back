@@ -254,14 +254,6 @@ def extract_numeric_timestamp(registration_date):
     print(numeric_timestamp)
     return numeric_timestamp
 
-def remove_milliseconds(dt):
-    # マイクロ秒部分を0に設定してミリ秒を削除
-    return dt.replace(microsecond=0)
-
-def parse_datetime(date_str):
-    # ISO 8601形式の文字列からdatetimeオブジェクトを生成
-    return datetime.fromisoformat(date_str)
-
 
 @app.post('/login')
 async def login(user: User):
@@ -345,11 +337,8 @@ async def add_trade(trade: Trades):
     if not user_info:
         raise HTTPException(status_code=404, detail="User not found")
 
-    # 文字列の日時データをパース
-    buy_time_parsed = parse_datetime(product.buy_time)
-
     # UTCで取得した日時をJSTに変換
-    buy_time_utc = remove_millisecondsbuy_time_parsed)
+    buy_time_utc = trade.buy_time
     jst = pytz.timezone('Asia/Tokyo')
     buy_time_jst = buy_time_utc.astimezone(jst)
 
@@ -379,12 +368,8 @@ def add_deal_detail(products: ProductList):
     jst = pytz.timezone('Asia/Tokyo')  # 日本時間のタイムゾーンを設定
 
     for product in products.products:
-
-        # 文字列の日時データをパース
-        buy_time_parsed = parse_datetime(product.buy_time)
-        
         # UTCで取得した日時をJSTに変換
-        buy_time_utc = remove_milliseconds(buy_time_parsed)
+        buy_time_utc = product.buy_time
         buy_time_jst = buy_time_utc.astimezone(jst)
 
         new_detail = Deal_DetailsDB(
@@ -790,11 +775,14 @@ async def read_message_info(
     # combined_df から特定のカラムのみを含む新しい DataFrame を作成
     selected_columns_df = combined_df[['buyer_name', 'range_name', 'seller_name', 'message']]
 
-    # DataFrame を JSON に変換して応答
-    return selected_columns_df.to_dict(orient="records")
+    # DataFrameを辞書のリストとして変換
+    records = selected_columns_df.to_dict(orient="records")
+    
+    # 'message_info' キーで辞書を作成
+    response = {"message_info": records}
+    
+    # 応答としてreturnする
+    return response
 
-    # else:
-    #     db.close()
-    #     return JSONResponse(content={"deal_details": "購買履歴がありません"}, status_code=404)
 
 
