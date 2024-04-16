@@ -258,6 +258,10 @@ def remove_milliseconds(dt):
     # マイクロ秒部分を0に設定してミリ秒を削除
     return dt.replace(microsecond=0)
 
+def parse_datetime(date_str):
+    # ISO 8601形式の文字列からdatetimeオブジェクトを生成
+    return datetime.fromisoformat(date_str)
+
 
 @app.post('/login')
 async def login(user: User):
@@ -341,8 +345,11 @@ async def add_trade(trade: Trades):
     if not user_info:
         raise HTTPException(status_code=404, detail="User not found")
 
+    # 文字列の日時データをパース
+    buy_time_parsed = parse_datetime(product.buy_time)
+
     # UTCで取得した日時をJSTに変換
-    buy_time_utc = remove_milliseconds(product.buy_time)
+    buy_time_utc = remove_millisecondsbuy_time_parsed)
     jst = pytz.timezone('Asia/Tokyo')
     buy_time_jst = buy_time_utc.astimezone(jst)
 
@@ -372,8 +379,12 @@ def add_deal_detail(products: ProductList):
     jst = pytz.timezone('Asia/Tokyo')  # 日本時間のタイムゾーンを設定
 
     for product in products.products:
+
+        # 文字列の日時データをパース
+        buy_time_parsed = parse_datetime(product.buy_time)
+        
         # UTCで取得した日時をJSTに変換
-        buy_time_utc = remove_milliseconds(product.buy_time)
+        buy_time_utc = remove_milliseconds(buy_time_parsed)
         buy_time_jst = buy_time_utc.astimezone(jst)
 
         new_detail = Deal_DetailsDB(
